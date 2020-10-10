@@ -1,0 +1,92 @@
+import requests
+import re
+from lxml import etree
+import pymysql
+from time import strftime, localtime
+import uuid
+
+
+class genshinChara(object):
+    def __init__(self):
+        self.url = "https://bbs.mihoyo.com/ys/obc/content/90/detail?bbs_presentation_style=no_header"
+        self.headers = {
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36"
+        }
+        self.req = None
+
+        self.list_roles_name = []  # 名字数组
+        self.list_roles_link = []  # 人物属性链接数组
+        self.list_roles_avatar = []  # 头像数组
+        self.list_roles_area = []  # 地区数组
+
+    def link(self):
+        print('开始获取')
+        self.req = requests.get(self.url, headers=self.headers)
+
+    def att(self):
+        print('开始匹配名字等')
+        xpath_name = '//div/table/tbody/tr/td/a/span/text()'  # 名字
+        xpath_roles_link = '//div/table/tbody/tr/td/a/@href'  # 角色页面地址
+        xpath_roles_avatar = '//div/table/tbody/tr/td/a/img/@src'  # 角色头像地址
+        xpath_roles_type = '//div/table/tbody/tr/@data-filter-tag'  # 区域 元素 攻击类型
+
+        html = etree.HTML(self.req.content.decode('utf8'))
+        self.list_roles_name = html.xpath(xpath_name)  # 拿到名字
+        self.list_roles_link = html.xpath(xpath_roles_link)  # 拿到地址页链接
+        self.list_roles_avatar = html.xpath(xpath_roles_avatar)  # 拿到头像链接
+        r_type = html.xpath(xpath_roles_type)
+        print("nameType", str(self.list_roles_name[9]), type(str(self.list_roles_name[9])))
+        for i in range(len(r_type)):
+            if len(re.findall('区域-(.*?) 元素', r_type[i])):
+                area = re.findall('区域-(.*?) 元素', r_type[i])[0]
+            else:
+                area = re.findall('区域-(.*?)$', r_type[i])[0]
+
+            if area == '未知':
+                area = '0'
+            elif area == "蒙德":
+                area = '1'
+            elif area == "璃月":
+                area = '2'
+            self.list_roles_area.append(area)  # 拿到地区
+
+    def link_mysql(self):  # 链接数据库
+        print("开始链接数据库\n开始写入数据库")
+        link = {
+            "host": "localhost",
+            "port": 3306,
+            "user": "root",
+            "password": "chio",
+            "database": "genshin",
+            "charset": "utf8"
+        }
+
+        con = pymysql.connect(**link)
+        sor = con.cursor()
+        for i in range(len(self.list_roles_name)):
+            now_time = strftime("%Y-%m-%d %H:%M:%S", localtime())
+            numbering = i + 1
+            uid = str(uuid.uuid4())
+            sql_insert = "insert into GENSHIN_CHARACTER() values(%s,%s,%s,%s,%s,0,%s,%s)"  # 添加数据
+
+            try:
+                sor.execute(sql_insert,
+                            (pymysql.escape_string(uid),
+                             pymysql.escape_string(self.list_roles_name[i]),
+                             pymysql.escape_string(self.list_roles_link[i]),
+                             pymysql.escape_string(self.list_roles_avatar[i]),
+                             pymysql.escape_string(self.list_roles_area[i]),
+                             numbering,
+                             pymysql.escape_string(now_time)))
+                con.commit()
+            except Exception as e:
+                print(e)
+        con.close()
+
+
+if __name__ == '__main__':
+    gsc = genshinChara()
+    gsc.link()
+    gsc.att()
+    gsc.link_mysql()
+
