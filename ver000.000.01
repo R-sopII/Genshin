@@ -55,9 +55,9 @@ class genshinChara(object):
         link = {
             "host": "localhost",
             "port": 3306,
-            "user": "root",
-            "password": "chio",
-            "database": "genshin",
+            "user": "",  # 用户名
+            "password": "",  # 密码
+            "database": "",  # 数据库名
             "charset": "utf8"
         }
 
